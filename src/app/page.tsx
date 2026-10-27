@@ -7,7 +7,6 @@ import CountdownSection from "@/components/CountdownSection";
 import PhotosSection from "@/components/PhotosSection";
 import DiarySection from "@/components/DiarySection";
 import WishesSection from "@/components/WishesSection";
-import { isSupabaseConfigured } from "@/lib/supabase";
 
 type Tab = "countdown" | "photos" | "diary" | "wishes";
 
@@ -24,15 +23,6 @@ function Shell() {
   return (
     <div className="min-h-screen">
       <Header />
-
-      {!isSupabaseConfigured && (
-        <div className="mx-auto max-w-5xl px-4">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-            ⚠️ 尚未配置 Supabase。请先按 README 完成配置并填入{" "}
-            <code className="rounded bg-amber-100 px-1">.env.local</code>，再刷新页面。
-          </div>
-        </div>
-      )}
 
       {/* 标签导航 */}
       <nav className="sticky top-0 z-40 mx-auto mt-2 flex w-full max-w-5xl gap-1 px-4">

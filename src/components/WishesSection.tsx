@@ -3,14 +3,14 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { useRealtimeTable } from "@/lib/useRealtimeTable";
-import { supabase } from "@/lib/supabase";
+import { usePollingTable } from "@/lib/usePollingTable";
+import { createItem, updateItem, deleteItem } from "@/lib/api";
 import type { Wish } from "@/lib/types";
 import { timeAgo } from "@/lib/format";
 
 export default function WishesSection() {
-  const { user, nickname } = useAuth();
-  const { rows: wishes, loading } = useRealtimeTable<Wish>("wishes");
+  const { deviceId, nickname } = useAuth();
+  const { rows: wishes, loading } = usePollingTable<Wish>("wishes");
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -19,26 +19,36 @@ export default function WishesSection() {
 
   async function handleAdd(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!user || !content.trim()) return;
+    if (!deviceId || !content.trim()) return;
     setBusy(true);
     setMsg(null);
-    const { error } = await supabase.from("wishes").insert({
-      user_id: user.id,
-      author_name: nickname || "匿名",
-      content: content.trim(),
-    });
+    try {
+      await createItem("wishes", {
+        author_name: nickname || "匿名",
+        content: content.trim(),
+      });
+      setContent("");
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : String(err));
+    }
     setBusy(false);
-    if (error) setMsg(error.message);
-    else setContent("");
   }
 
   async function handleToggle(wish: Wish) {
-    if (!user || user.id !== wish.user_id) return;
-    await supabase.from("wishes").update({ done: !wish.done }).eq("id", wish.id);
+    if (!deviceId || deviceId !== wish.device_id) return;
+    try {
+      await updateItem("wishes", wish.id, { done: !wish.done });
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   async function handleDelete(id: string) {
-    await supabase.from("wishes").delete().eq("id", id);
+    try {
+      await deleteItem("wishes", id);
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   return (
@@ -51,31 +61,25 @@ export default function WishesSection() {
       </div>
 
       {/* 添加心愿 */}
-      {user ? (
-        <form
-          onSubmit={handleAdd}
-          className="mb-6 flex gap-2 rounded-2xl border border-rose-100 bg-white/80 p-4 shadow-sm"
+      <form
+        onSubmit={handleAdd}
+        className="mb-6 flex gap-2 rounded-2xl border border-rose-100 bg-white/80 p-4 shadow-sm"
+      >
+        <input
+          type="text"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="写下一个小愿望，如：去海边看一次日出"
+          className="flex-1 rounded-xl border border-stone-200 px-4 py-2.5 text-sm outline-none focus:border-rose-300"
+        />
+        <button
+          type="submit"
+          disabled={busy || !content.trim()}
+          className="rounded-xl bg-rose-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-rose-600 disabled:opacity-60"
         >
-          <input
-            type="text"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="写下一个小愿望，如：去海边看一次日出"
-            className="flex-1 rounded-xl border border-stone-200 px-4 py-2.5 text-sm outline-none focus:border-rose-300"
-          />
-          <button
-            type="submit"
-            disabled={busy || !content.trim()}
-            className="rounded-xl bg-rose-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-rose-600 disabled:opacity-60"
-          >
-            {busy ? "添加中…" : "许愿"}
-          </button>
-        </form>
-      ) : (
-        <p className="mb-6 rounded-2xl bg-white/60 p-4 text-center text-sm text-stone-400">
-          正在连接…
-        </p>
-      )}
+          {busy ? "添加中…" : "许愿"}
+        </button>
+      </form>
       {msg && <p className="mb-3 text-sm text-red-500">{msg}</p>}
 
       {/* 心愿列表 */}
@@ -94,7 +98,7 @@ export default function WishesSection() {
             >
               <button
                 onClick={() => handleToggle(w)}
-                disabled={!user || user.id !== w.user_id}
+                disabled={!deviceId || deviceId !== w.device_id}
                 className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs transition-colors ${
                   w.done
                     ? "border-rose-400 bg-rose-400 text-white"
@@ -119,7 +123,7 @@ export default function WishesSection() {
                   {w.done && " · 已实现 🎉"}
                 </p>
               </div>
-              {user?.id === w.user_id && (
+              {deviceId === w.device_id && (
                 <button
                   onClick={() => handleDelete(w.id)}
                   className="text-stone-300 transition-colors hover:text-red-400"

@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { useRealtimeTable } from "@/lib/useRealtimeTable";
-import { supabase } from "@/lib/supabase";
+import { usePollingTable } from "@/lib/usePollingTable";
+import { createItem, deleteItem } from "@/lib/api";
 import type { Countdown } from "@/lib/types";
 import { countdownParts, formatTargetDate } from "@/lib/format";
 
@@ -20,8 +20,8 @@ function TimeUnit({ value, label }: { value: number; label: string }) {
 }
 
 export default function CountdownSection() {
-  const { user, nickname } = useAuth();
-  const { rows: list, loading } = useRealtimeTable<Countdown>("countdowns");
+  const { deviceId, nickname } = useAuth();
+  const { rows: list, loading } = usePollingTable<Countdown>("countdowns");
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [busy, setBusy] = useState(false);
@@ -42,25 +42,29 @@ export default function CountdownSection() {
 
   async function handleAdd(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!user || !title.trim() || !date) return;
+    if (!deviceId || !title.trim() || !date) return;
     setBusy(true);
     setMsg(null);
-    const { error } = await supabase.from("countdowns").insert({
-      user_id: user.id,
-      author_name: nickname || "匿名",
-      title: title.trim(),
-      target_date: date,
-    });
-    setBusy(false);
-    if (error) setMsg(error.message);
-    else {
+    try {
+      await createItem("countdowns", {
+        author_name: nickname || "匿名",
+        title: title.trim(),
+        target_date: date,
+      });
       setTitle("");
       setDate("");
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : String(err));
     }
+    setBusy(false);
   }
 
   async function handleDelete(id: string) {
-    await supabase.from("countdowns").delete().eq("id", id);
+    try {
+      await deleteItem("countdowns", id);
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   return (
@@ -68,7 +72,7 @@ export default function CountdownSection() {
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-stone-800">⏳ 倒计时</h2>
         <span className="text-xs text-stone-400">
-          {list.length} 个日子，实时同步
+          {list.length} 个日子，自动同步
         </span>
       </div>
 
@@ -84,37 +88,31 @@ export default function CountdownSection() {
       )}
 
       {/* 添加倒计时 */}
-      {user ? (
-        <form
-          onSubmit={handleAdd}
-          className="mb-6 flex flex-col gap-2 rounded-2xl border border-rose-100 bg-white/80 p-4 shadow-sm sm:flex-row sm:items-center"
+      <form
+        onSubmit={handleAdd}
+        className="mb-6 flex flex-col gap-2 rounded-2xl border border-rose-100 bg-white/80 p-4 shadow-sm sm:flex-row sm:items-center"
+      >
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="给这个日子起个名字，如：结婚纪念日"
+          className="flex-1 rounded-xl border border-stone-200 px-4 py-2.5 text-sm outline-none focus:border-rose-300"
+        />
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="rounded-xl border border-stone-200 px-4 py-2.5 text-sm outline-none focus:border-rose-300"
+        />
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-xl bg-rose-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-rose-600 disabled:opacity-60"
         >
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="给这个日子起个名字，如：结婚纪念日"
-            className="flex-1 rounded-xl border border-stone-200 px-4 py-2.5 text-sm outline-none focus:border-rose-300"
-          />
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="rounded-xl border border-stone-200 px-4 py-2.5 text-sm outline-none focus:border-rose-300"
-          />
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-xl bg-rose-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-rose-600 disabled:opacity-60"
-          >
-            {busy ? "添加中…" : "添加"}
-          </button>
-        </form>
-      ) : (
-        <p className="mb-6 rounded-2xl bg-white/60 p-4 text-center text-sm text-stone-400">
-          正在连接…
-        </p>
-      )}
+          {busy ? "添加中…" : "添加"}
+        </button>
+      </form>
       {msg && <p className="mb-3 text-sm text-red-500">{msg}</p>}
 
       {/* 其余倒计时列表 */}
@@ -138,7 +136,7 @@ export default function CountdownSection() {
                         : ` · 还有 ${p.days} 天`}
                   </p>
                 </div>
-                {user?.id === c.user_id && (
+                {deviceId === c.device_id && (
                   <button
                     onClick={() => handleDelete(c.id)}
                     className="rounded-full p-1.5 text-stone-300 transition-colors hover:bg-red-50 hover:text-red-400"

@@ -3,16 +3,14 @@
 import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { useRealtimeTable } from "@/lib/useRealtimeTable";
-import { supabase, photoUrl } from "@/lib/supabase";
+import { usePollingTable } from "@/lib/usePollingTable";
+import { uploadPhoto, deleteItem, photoUrl } from "@/lib/api";
 import type { Photo } from "@/lib/types";
 import { timeAgo } from "@/lib/format";
 
-const MAX_SIZE = 10 * 1024 * 1024; // 10MB
-
 export default function PhotosSection() {
-  const { user, nickname } = useAuth();
-  const { rows: photos, loading } = useRealtimeTable<Photo>("photos");
+  const { deviceId, nickname } = useAuth();
+  const { rows: photos, loading } = usePollingTable<Photo>("photos");
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -22,42 +20,24 @@ export default function PhotosSection() {
   async function handleUpload(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ""; // 允许重复选同一张图
-    if (!file || !user) return;
-    if (file.size > MAX_SIZE) {
-      setMsg("图片不能超过 10MB");
-      return;
-    }
+    if (!file || !deviceId) return;
     setBusy(true);
     setMsg(null);
-
-    const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase();
-    const path = `${user.id}/${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 8)}.${ext}`;
-
-    const { error: upErr } = await supabase.storage
-      .from("photos")
-      .upload(path, file);
-    if (upErr) {
-      setBusy(false);
-      setMsg(upErr.message);
-      return;
+    try {
+      await uploadPhoto(file, caption.trim(), nickname || "匿名");
+      setCaption("");
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : String(err));
     }
-
-    const { error: insErr } = await supabase.from("photos").insert({
-      user_id: user.id,
-      author_name: nickname || "匿名",
-      caption: caption.trim(),
-      storage_path: path,
-    });
     setBusy(false);
-    if (insErr) setMsg(insErr.message);
-    else setCaption("");
   }
 
   async function handleDelete(photo: Photo) {
-    await supabase.from("photos").delete().eq("id", photo.id);
-    await supabase.storage.from("photos").remove([photo.storage_path]);
+    try {
+      await deleteItem("photos", photo.id);
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   return (
@@ -65,40 +45,34 @@ export default function PhotosSection() {
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-stone-800">📷 照片墙</h2>
         <span className="text-xs text-stone-400">
-          {photos.length} 张照片，实时同步
+          {photos.length} 张照片，自动同步
         </span>
       </div>
 
       {/* 上传区 */}
-      {user ? (
-        <div className="mb-6 flex flex-col gap-2 rounded-2xl border border-rose-100 bg-white/80 p-4 shadow-sm sm:flex-row sm:items-center">
-          <input
-            type="text"
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            placeholder="给照片写句话（可选）"
-            className="flex-1 rounded-xl border border-stone-200 px-4 py-2.5 text-sm outline-none focus:border-rose-300"
-          />
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            onChange={handleUpload}
-            className="hidden"
-          />
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={busy}
-            className="rounded-xl bg-rose-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-rose-600 disabled:opacity-60"
-          >
-            {busy ? "上传中…" : "上传照片"}
-          </button>
-        </div>
-      ) : (
-        <p className="mb-6 rounded-2xl bg-white/60 p-4 text-center text-sm text-stone-400">
-          正在连接…
-        </p>
-      )}
+      <div className="mb-6 flex flex-col gap-2 rounded-2xl border border-rose-100 bg-white/80 p-4 shadow-sm sm:flex-row sm:items-center">
+        <input
+          type="text"
+          value={caption}
+          onChange={(e) => setCaption(e.target.value)}
+          placeholder="给照片写句话（可选）"
+          className="flex-1 rounded-xl border border-stone-200 px-4 py-2.5 text-sm outline-none focus:border-rose-300"
+        />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          onChange={handleUpload}
+          className="hidden"
+        />
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={busy}
+          className="rounded-xl bg-rose-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-rose-600 disabled:opacity-60"
+        >
+          {busy ? "上传中…" : "上传照片"}
+        </button>
+      </div>
       {msg && <p className="mb-3 text-sm text-red-500">{msg}</p>}
 
       {/* 照片网格 */}
@@ -139,7 +113,7 @@ export default function PhotosSection() {
                   </p>
                 </figcaption>
               )}
-              {user?.id === p.user_id && (
+              {deviceId === p.device_id && (
                 <button
                   onClick={() => handleDelete(p)}
                   className="absolute right-2 top-2 rounded-full bg-black/40 p-1.5 text-white opacity-0 transition-opacity hover:bg-red-500 group-hover:opacity-100"

@@ -8,44 +8,36 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import type { User } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
 
 type SessionContextValue = {
-  user: User | null;
-  loading: boolean;
+  deviceId: string;
   nickname: string;
   setNickname: (n: string) => void;
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 const NICKNAME_KEY = "kikmkjj:nickname";
+const DEVICE_KEY = "kikmkjj:device";
+
+function randomId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "id-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [deviceId, setDeviceId] = useState("");
   const [nickname, setNicknameState] = useState("");
 
   useEffect(() => {
     setNicknameState(localStorage.getItem(NICKNAME_KEY) ?? "");
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        setUser(data.session.user);
-        setLoading(false);
-        return;
-      }
-      // 免注册：匿名登录，获得一个仅本设备有效的身份（用于「只能删自己发的」）
-      supabase.auth.signInAnonymously().then(({ data }) => {
-        setUser(data.user ?? null);
-        setLoading(false);
-      });
-    });
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => sub.subscription.unsubscribe();
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id) {
+      id = randomId();
+      localStorage.setItem(DEVICE_KEY, id);
+    }
+    setDeviceId(id);
   }, []);
 
   const setNickname = useCallback((n: string) => {
@@ -54,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <SessionContext.Provider value={{ user, loading, nickname, setNickname }}>
+    <SessionContext.Provider value={{ deviceId, nickname, setNickname }}>
       {children}
     </SessionContext.Provider>
   );

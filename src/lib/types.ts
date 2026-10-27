@@ -1,6 +1,6 @@
 export type DiaryEntry = {
   id: string;
-  user_id: string;
+  device_id: string;
   author_name: string;
   content: string;
   mood: string;
@@ -9,7 +9,7 @@ export type DiaryEntry = {
 
 export type Photo = {
   id: string;
-  user_id: string;
+  device_id: string;
   author_name: string;
   caption: string;
   storage_path: string;
@@ -18,7 +18,7 @@ export type Photo = {
 
 export type Wish = {
   id: string;
-  user_id: string;
+  device_id: string;
   author_name: string;
   content: string;
   done: boolean;
@@ -27,7 +27,7 @@ export type Wish = {
 
 export type Countdown = {
   id: string;
-  user_id: string;
+  device_id: string;
   author_name: string;
   title: string;
   target_date: string; // YYYY-MM-DD
