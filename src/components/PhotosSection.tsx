@@ -11,7 +11,7 @@ import { timeAgo } from "@/lib/format";
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
 export default function PhotosSection() {
-  const { user } = useAuth();
+  const { user, nickname } = useAuth();
   const { rows: photos, loading } = useRealtimeTable<Photo>("photos");
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
@@ -46,7 +46,7 @@ export default function PhotosSection() {
 
     const { error: insErr } = await supabase.from("photos").insert({
       user_id: user.id,
-      author_name: (user.user_metadata?.nickname as string) ?? "匿名",
+      author_name: nickname || "匿名",
       caption: caption.trim(),
       storage_path: path,
     });
@@ -96,7 +96,7 @@ export default function PhotosSection() {
         </div>
       ) : (
         <p className="mb-6 rounded-2xl bg-white/60 p-4 text-center text-sm text-stone-400">
-          登录后即可上传照片
+          正在连接…
         </p>
       )}
       {msg && <p className="mb-3 text-sm text-red-500">{msg}</p>}

@@ -11,7 +11,7 @@ import { timeAgo } from "@/lib/format";
 const MOODS = ["😊", "🙂", "😐", "😢", "😡", "🥰", "😴", "🤩"];
 
 export default function DiarySection() {
-  const { user } = useAuth();
+  const { user, nickname } = useAuth();
   const { rows: entries, loading } = useRealtimeTable<DiaryEntry>("diary");
   const [content, setContent] = useState("");
   const [mood, setMood] = useState("🙂");
@@ -25,7 +25,7 @@ export default function DiarySection() {
     setMsg(null);
     const { error } = await supabase.from("diary").insert({
       user_id: user.id,
-      author_name: (user.user_metadata?.nickname as string) ?? "匿名",
+      author_name: nickname || "匿名",
       content: content.trim(),
       mood,
     });
@@ -93,7 +93,7 @@ export default function DiarySection() {
         </form>
       ) : (
         <p className="mb-6 rounded-2xl bg-white/60 p-4 text-center text-sm text-stone-400">
-          登录后即可写日记
+          正在连接…
         </p>
       )}
       {msg && <p className="mb-3 text-sm text-red-500">{msg}</p>}

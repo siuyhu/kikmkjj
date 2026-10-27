@@ -11,67 +11,57 @@ import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
-type AuthContextValue = {
+type SessionContextValue = {
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (
-    email: string,
-    password: string,
-    nickname: string,
-  ) => Promise<{ error: string | null }>;
-  signOut: () => Promise<void>;
+  nickname: string;
+  setNickname: (n: string) => void;
 };
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+const SessionContext = createContext<SessionContextValue | null>(null);
+const NICKNAME_KEY = "kikmkjj:nickname";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [nickname, setNicknameState] = useState("");
 
   useEffect(() => {
+    setNicknameState(localStorage.getItem(NICKNAME_KEY) ?? "");
+
     supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setLoading(false);
+      if (data.session) {
+        setUser(data.session.user);
+        setLoading(false);
+        return;
+      }
+      // 免注册：匿名登录，获得一个仅本设备有效的身份（用于「只能删自己发的」）
+      supabase.auth.signInAnonymously().then(({ data }) => {
+        setUser(data.user ?? null);
+        setLoading(false);
+      });
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       setUser(session?.user ?? null);
     });
-
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
-  }, []);
-
-  const signUp = useCallback(
-    async (email: string, password: string, nickname: string) => {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { nickname } },
-      });
-      return { error: error?.message ?? null };
-    },
-    [],
-  );
-
-  const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+  const setNickname = useCallback((n: string) => {
+    setNicknameState(n);
+    localStorage.setItem(NICKNAME_KEY, n);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <SessionContext.Provider value={{ user, loading, nickname, setNickname }}>
       {children}
-    </AuthContext.Provider>
+    </SessionContext.Provider>
   );
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
+  const ctx = useContext(SessionContext);
   if (!ctx) throw new Error("useAuth 必须在 AuthProvider 内使用");
   return ctx;
 }

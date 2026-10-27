@@ -82,9 +82,9 @@ on conflict (id) do nothing;
 -- 公开读取
 create policy "public read photo objects" on storage.objects
   for select using (bucket_id = 'photos');
--- 登录用户可上传
+-- 任何已登录用户（含匿名）可上传
 create policy "auth upload photo objects" on storage.objects
-  for insert with check (bucket_id = 'photos' and auth.role() = 'authenticated');
+  for insert with check (bucket_id = 'photos' and auth.uid() is not null);
 -- 仅本人可删除
 create policy "owner delete photo objects" on storage.objects
   for delete using (bucket_id = 'photos' and auth.uid() = owner);

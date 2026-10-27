@@ -5,8 +5,8 @@
 功能：📷 照片墙（上传）、⏳ 倒计时（实时跳动）、📔 日记、⭐ 心愿清单，全部**实时同步**。
 
 - 浏览：完全公开，无需登录
-- 发布（上传照片 / 写日记 / 许愿 / 加倒计时）：需要注册登录
-- 每个账号的内容只归本人可改、可删
+- 发布（上传照片 / 写日记 / 许愿 / 加倒计时）：也无需注册！打开即用，右上角填个昵称就能发
+- 每个「设备」只能删自己发的内容
 
 ---
 
@@ -25,7 +25,7 @@ npm run dev
 
 1. 打开 [supabase.com](https://supabase.com)，注册 / 登录，**New project** 建一个项目（区域选离你近的，如 Singapore / Tokyo）。
 2. 左侧菜单 **SQL Editor → New query**，把本仓库 `supabase/schema.sql` 的**全文粘贴进去，点 Run**。这会一次建好 4 张表、权限、实时同步和照片存储桶。
-3. 左侧 **Authentication → Providers → Email**，把 **Confirm email** 关掉（`Off`），这样家人注册后立即生效、不用去邮箱点确认。
+3. 左侧 **Authentication → Sign In / Providers**，把 **Anonymous** 开关打开（`On`），这样访客打开网站即自动匿名登录、无需注册。
 4. 左侧 **Project Settings → API**，复制两个值：
    - `Project URL`
    - `anon` `public` key

@@ -9,7 +9,7 @@ import type { Wish } from "@/lib/types";
 import { timeAgo } from "@/lib/format";
 
 export default function WishesSection() {
-  const { user } = useAuth();
+  const { user, nickname } = useAuth();
   const { rows: wishes, loading } = useRealtimeTable<Wish>("wishes");
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
@@ -24,7 +24,7 @@ export default function WishesSection() {
     setMsg(null);
     const { error } = await supabase.from("wishes").insert({
       user_id: user.id,
-      author_name: (user.user_metadata?.nickname as string) ?? "匿名",
+      author_name: nickname || "匿名",
       content: content.trim(),
     });
     setBusy(false);
@@ -73,7 +73,7 @@ export default function WishesSection() {
         </form>
       ) : (
         <p className="mb-6 rounded-2xl bg-white/60 p-4 text-center text-sm text-stone-400">
-          登录后即可许愿
+          正在连接…
         </p>
       )}
       {msg && <p className="mb-3 text-sm text-red-500">{msg}</p>}
