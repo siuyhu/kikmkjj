@@ -11,7 +11,14 @@ function ok(data: unknown) {
   return NextResponse.json({ data });
 }
 function err(e: unknown, status = 500) {
-  const msg = e instanceof Error ? e.message : String(e ?? "未知错误");
+  let msg = "未知错误";
+  if (e instanceof Error) {
+    msg = e.message;
+  } else if (e && typeof e === "object" && "message" in e) {
+    msg = String((e as { message: unknown }).message ?? "未知错误");
+  } else {
+    msg = String(e ?? "未知错误");
+  }
   return NextResponse.json({ error: msg }, { status });
 }
 
